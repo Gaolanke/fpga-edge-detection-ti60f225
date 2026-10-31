@@ -132,11 +132,7 @@ $env:EFINITY_HOME = 'C:\Efinity\2026.1'
 
 ## 文档
 
-- [作品报告（PDF）](docs/report/FPGA_Edge_Detection_System_Report_CN.pdf)
-- [作品报告（DOCX）](docs/report/FPGA_Edge_Detection_System_Report_CN.docx)
 - [v8.12 版本说明](docs/release-v8.12.md)
-
-作品报告中保留了 6 个实物照片占位框，提交前可替换为现场照片。
 
 ## 验证状态
 

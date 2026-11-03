@@ -30,8 +30,7 @@ module true_dual_port_ram
 );
 
 	localparam MEMORY_DEPTH = 2**ADDR_WIDTH;
-	localparam MAX_DATA = (1<<ADDR_WIDTH)-1;
-	
+
 	reg [DATA_WIDTH-1:0] ram [MEMORY_DEPTH-1:0];
 	
 	reg [DATA_WIDTH-1:0] r_dout1_1P;

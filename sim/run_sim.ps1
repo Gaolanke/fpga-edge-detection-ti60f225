@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('edge', 'sobel', 'chain', 'scale', 'roi', 'gamma', 'debayer', 'clipper', 'sensor', 'camcfg', 'awb', 'shape', 'ink', 'all', 'clean', 'wave')]
+    [ValidateSet('edge', 'sobel', 'chain', 'scale', 'roi', 'gamma', 'debayer', 'clipper', 'sensor', 'camcfg', 'awb', 'shape', 'ink', 'key', 'all', 'clean', 'wave')]
     [string]$Test = 'all',
     [switch]$Strict
 )
@@ -92,16 +92,25 @@ function Invoke-HdlTest {
     )
     $vvpPath = Join-Path $outDir "$Name.vvp"
     $logPath = Join-Path $outDir "$Name.log"
-    $compileArgs = @('-g2012', '-o', $vvpPath, '-s', $Top, $edgeRtl) + $ExtraRtl + @($Testbench)
+    $compileArgs = @('-g2012', '-I', (Join-Path $projRoot 'rtl'), '-o', $vvpPath, '-s', $Top, $edgeRtl) + $ExtraRtl + @($Testbench)
     Write-Host "Compiling $Name ..."
-    & $iverilog @compileArgs
+    # iverilog/vvp 的 warning 走 stderr; EAP=Stop 会把 stderr 行当异常直接终止脚本.
+    # 放宽到 Continue 再恢复, 真正的失败由 $LASTEXITCODE 兜底.
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $compileOutput = & $iverilog @compileArgs 2>&1
+    $ErrorActionPreference = $prevEap
+    foreach ($line in $compileOutput) { Write-Host "  $line" }
     if ($LASTEXITCODE -ne 0) { throw "$Name compile failed." }
 
     $runArgs = @($vvpPath)
     if ($Vcd) { $runArgs += '+vcd' }
     if ($Strict) { $runArgs += '+strict' }
     Write-Host "Running $Name ..."
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
     $lines = & $vvp @runArgs 2>&1
+    $ErrorActionPreference = $prevEap
     $lines | Tee-Object -FilePath $logPath | Out-Host
     if ($LASTEXITCODE -ne 0) { throw "$Name simulation failed." }
     Convert-PpmOutputs
@@ -169,10 +178,16 @@ switch ($Test) {
             -Testbench (Join-Path $tbDir 'tb_shape_ink.v') `
             -ExtraRtl (Join-Path $projRoot 'rtl\edge\shape_ink.v')
     }
+    'key' {
+        Invoke-HdlTest -Name 'tb_key_ctrl' -Top 'tb_key_ctrl' `
+            -Testbench (Join-Path $tbDir 'tb_key_ctrl.v') `
+            -ExtraRtl (Join-Path $projRoot 'rtl\ti60f225_oob_top.v')
+    }
     'shape' {
+        # shape_rec.v 已改名为 .bak (从综合源里移除旧识别器), 仿真按内容直接编译 .bak
         Invoke-HdlTest -Name 'tb_shape_rec' -Top 'tb_shape_rec' `
             -Testbench (Join-Path $tbDir 'tb_shape_rec.v') `
-            -ExtraRtl (Join-Path $projRoot 'rtl\edge\shape_rec.v')
+            -ExtraRtl (Join-Path $projRoot 'rtl\edge\shape_rec.v.bak')
     }
     'camcfg' {
         Invoke-HdlTest -Name 'tb_cam_cfg_sched' -Top 'tb_cam_cfg_sched' `
@@ -212,10 +227,13 @@ switch ($Test) {
             -ExtraRtl (Join-Path $projRoot 'rtl\cam_ae_awb.v')
         Invoke-HdlTest -Name 'tb_shape_rec' -Top 'tb_shape_rec' `
             -Testbench (Join-Path $tbDir 'tb_shape_rec.v') `
-            -ExtraRtl (Join-Path $projRoot 'rtl\edge\shape_rec.v')
+            -ExtraRtl (Join-Path $projRoot 'rtl\edge\shape_rec.v.bak')
         Invoke-HdlTest -Name 'tb_shape_ink' -Top 'tb_shape_ink' `
             -Testbench (Join-Path $tbDir 'tb_shape_ink.v') `
             -ExtraRtl (Join-Path $projRoot 'rtl\edge\shape_ink.v')
+        Invoke-HdlTest -Name 'tb_key_ctrl' -Top 'tb_key_ctrl' `
+            -Testbench (Join-Path $tbDir 'tb_key_ctrl.v') `
+            -ExtraRtl (Join-Path $projRoot 'rtl\ti60f225_oob_top.v')
     }
     'wave' {
         Invoke-HdlTest -Name 'tb_edge_proc' -Top 'tb_edge_proc' `

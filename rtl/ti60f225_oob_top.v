@@ -614,7 +614,7 @@ assign io_cam_sda_OE = ~sda_padoen_o;
 
 //=====================================================================================
 // 高阶挑战: 帧缓存(DDR3) + 冻结/回放 (采集/存储/读取/处理 分离)
-//   free_on=1 (KEY2 长按) 时, 在摄像头场同步边沿切断写侧(i_vs/i_de): DDR3 不再写入新帧;
+//   free_on=1 (板KEY4 长按) 时, 在摄像头场同步边沿切断写侧(i_vs/i_de): DDR3 不再写入新帧;
 //   写侧最后一帧排空后, ddr_buffer 再在显示帧边界锁住读侧 bank, 让 cvo_axi
 //   按显示帧节拍反复读取同一个完整 bank (避免长按瞬间锁到未写完的 bank).
 //   注意: 不能只切断写侧而不冻结读 bank, 否则三 bank 握手会在读侧等不到写侧切换,
@@ -1333,8 +1333,11 @@ always @(posedge hdmi_tx_slow_clk or negedge vid_rst_n) begin
     end else begin
         // 长按 KEY3: 无条件切显示模式, 并退出摄像头调节模式.
         // 原实现里调节模式下的长按只退出、不切模式, 按下去像没反应.
-        // 用 !k_dn0 排除 KEY1+KEY3 组合键(切页), 避免按久了误切模式.
-        if (k_lg2 && !k_dn0) begin
+        // 用 !k_dn0 排除 KEY2+KEY3 组合键(进/出调节模式), 避免按久了误切模式.
+        // 注意按键编号是板上丝印: 板KEY1=GPIOL_07(复位), 板KEY2=GPIOR_22=key_i[0],
+        // 板KEY3=GPIOR_21=key_i[1], 板KEY4=GPIOL_03=key_i[2] (见官方 01_Ti60F225_key_demo).
+        // 之前切模式挂在 key_i[2]=板KEY4 上, 用户按丝印 KEY3 触发的是冻结, 怎么按都不切.
+        if (k_lg1 && !k_dn0) begin
             cam_adj_mode <= 1'b0;
             wb_page      <= 1'b0;
             dmode        <= (dmode == 3'd4) ? 3'd0 : dmode + 1'b1;
@@ -1342,7 +1345,7 @@ always @(posedge hdmi_tx_slow_clk or negedge vid_rst_n) begin
             cam_adj_mode <= ~cam_adj_mode;       // 组合键切换调节模式
             wb_page      <= 1'b0;
         end else if (combo13_fire && cam_adj_mode) begin
-            wb_page <= ~wb_page;                 // KEY1+KEY3: 曝光/增益 <-> 白平衡
+            wb_page <= ~wb_page;                 // 板上 KEY2+KEY4: 曝光/增益 <-> 白平衡
         end else if (!cam_combo_block && !cam_combo13_block) begin
             if (cam_adj_mode) begin
                 if (!cfg_busy) begin
@@ -1364,7 +1367,7 @@ always @(posedge hdmi_tx_slow_clk or negedge vid_rst_n) begin
                             if (wb_r_level != 4'd15) wb_r_level <= wb_r_level + 1'b1;
                         end else if (k_sh0) begin // 红通道 -
                             if (wb_r_level != 4'd0) wb_r_level <= wb_r_level - 1'b1;
-                        end else if (k_lg1) begin // 蓝通道 +
+                        end else if (k_lg2) begin // 蓝通道 + (板KEY4 长按)
                             if (wb_b_level != 4'd15) wb_b_level <= wb_b_level + 1'b1;
                         end else if (k_sh1) begin // 蓝通道 -
                             if (wb_b_level != 4'd0) wb_b_level <= wb_b_level - 1'b1;
@@ -1383,7 +1386,7 @@ always @(posedge hdmi_tx_slow_clk or negedge vid_rst_n) begin
                             key_exp <= exp_code_from_level(exp_level - 1'b1);
                             key_req_tgl <= ~key_req_tgl;
                         end
-                    end else if (k_lg1) begin     // 增益 +
+                    end else if (k_lg2) begin     // 增益 + (板KEY4 长按)
                         if (gain_level != 4'd9) begin
                             gain_level     <= gain_level + 1'b1;
                             key_sel    <= 2'd1;
@@ -1406,7 +1409,7 @@ always @(posedge hdmi_tx_slow_clk or negedge vid_rst_n) begin
                 if (k_sh1 && (th_level != 4'h0)) th_level <= th_level - 1'b1;   // 阈值↓ 边缘更多
                 if (k_sh2) prefilt <= (prefilt == 2'd3) ? 2'd0 : prefilt + 1'b1;
                 if (k_lg0) color_mode <= (color_mode == 2'd3) ? 2'd0 : color_mode + 1'b1; // 边缘颜色循环
-                if (k_lg1) free_on <= ~free_on;                                  // 冻结/回放
+                if (k_lg2) free_on <= ~free_on;   // 板KEY4 长按: 冻结/回放
             end
         end
     end

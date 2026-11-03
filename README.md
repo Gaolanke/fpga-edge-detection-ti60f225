@@ -22,13 +22,13 @@
 | 项目 | 配置 |
 | --- | --- |
 | FPGA | Efinix Ti60F225I3（Titanium 家族，Ti60F225A_V4 Demo Board） |
-| 摄像头 | SC431HAI2，接 J4 转接板，4-lane MIPI CSI-2，RAW10 |
+| 摄像头 | SC431HAI2，接板上 FPC MIPI 座，4-lane MIPI CSI-2，RAW10 |
 | 摄像头 I²C | SCL=GPIOR_20，SDA=GPIOR_18（板上 4.7 kΩ 上拉至 3V3），RST=GPIOR_16，地址 0x30 |
-| MIPI Bank | J2、J3 均为 1.2 V |
-| 帧缓存 | 板载 DDR3 K4B4G1646E，三 Bank 乒乓 |
+| MIPI Bank | Bank 2A/2B，J2、J3 跳线选 1.2 V |
+| 帧缓存 | 板载 16 位 DDR3 MT41J128M16JT-125（800 Mbps），三 Bank 乒乓 |
 | 显示 | HDMI 1920×1080@60，像素时钟 148.5 MHz |
-| 按键 / 指示灯 | KEY1=GPIOR_22，KEY2=GPIOR_21，KEY3=GPIOL_03；D0~D7 |
-| 电源 | 12 V DC |
+| 按键 / 指示灯 | KEY1=GPIOR_22，KEY2=GPIOR_21，KEY3=GPIOL_03（KEY0=GPIOL_07 作复位）；LED0~LED7 |
+| 电源 | Type-C 5 V（同一根线兼作下载与 UART） |
 
 ![硬件连接](docs/images/hardware_connection.png)
 
@@ -79,10 +79,10 @@ ti60f225_oob.sdc            时序约束
 | --- | --- |
 | KEY1 短按 / 长按 | 阈值档位 +1 / 边缘颜色循环 |
 | KEY2 短按 / 长按 | 阈值档位 -1 / DDR3 画面冻结 |
-| KEY3 短按 / 长按 | 滤波模式循环 / 显示模式循环 |
+| KEY3 短按 | 滤波模式循环（中值→高斯→直通→中值+高斯） |
 | KEY1+KEY2 | 进入 / 退出摄像头调节模式（进入后 AE 与 AWB 均冻结） |
 | KEY1+KEY3 | 调节模式内：曝光/增益页 ↔ 白平衡页 |
-| KEY3 长按 | 退出调节模式 |
+| KEY3 长按（约 0.4 s） | **任何状态下都切显示模式**，并顺带退出调节模式 |
 
 白平衡页里 KEY1 长/短按调 R，KEY2 长/短按调 B，范围 0.375×~2.25×，每档 0.125×；
 KEY3 短按恢复默认并交还给自动白平衡。

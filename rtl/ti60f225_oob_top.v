@@ -1331,17 +1331,21 @@ always @(posedge hdmi_tx_slow_clk or negedge vid_rst_n) begin
         key_gain_c <= 8'h81;
         key_gain_f <= 8'h32;
     end else begin
-        if (combo12_fire) begin
+        // 长按 KEY3: 无条件切显示模式, 并退出摄像头调节模式.
+        // 原实现里调节模式下的长按只退出、不切模式, 按下去像没反应.
+        // 用 !k_dn0 排除 KEY1+KEY3 组合键(切页), 避免按久了误切模式.
+        if (k_lg2 && !k_dn0) begin
+            cam_adj_mode <= 1'b0;
+            wb_page      <= 1'b0;
+            dmode        <= (dmode == 3'd4) ? 3'd0 : dmode + 1'b1;
+        end else if (combo12_fire) begin
             cam_adj_mode <= ~cam_adj_mode;       // 组合键切换调节模式
             wb_page      <= 1'b0;
         end else if (combo13_fire && cam_adj_mode) begin
             wb_page <= ~wb_page;                 // KEY1+KEY3: 曝光/增益 <-> 白平衡
         end else if (!cam_combo_block && !cam_combo13_block) begin
             if (cam_adj_mode) begin
-                if (k_lg2) begin
-                    cam_adj_mode <= 1'b0;         // KEY3 长按退出调节模式
-                    wb_page      <= 1'b0;
-                end else if (!cfg_busy) begin
+                if (!cfg_busy) begin
                     if (k_sh2) begin
                         if (wb_page) begin       // 白平衡页: 恢复 R/B 默认
                             wb_r_level <= 4'd8;
@@ -1401,9 +1405,6 @@ always @(posedge hdmi_tx_slow_clk or negedge vid_rst_n) begin
                 if (k_sh0 && (th_level != 4'hF)) th_level <= th_level + 1'b1;   // 阈值↑ 边缘更少
                 if (k_sh1 && (th_level != 4'h0)) th_level <= th_level - 1'b1;   // 阈值↓ 边缘更多
                 if (k_sh2) prefilt <= (prefilt == 2'd3) ? 2'd0 : prefilt + 1'b1;
-                if (k_lg2) begin
-                    dmode <= (dmode == 3'd4) ? 3'd0 : dmode + 1'b1;   // 显示模式循环
-                end
                 if (k_lg0) color_mode <= (color_mode == 2'd3) ? 2'd0 : color_mode + 1'b1; // 边缘颜色循环
                 if (k_lg1) free_on <= ~free_on;                                  // 冻结/回放
             end
@@ -1855,7 +1856,7 @@ endmodule
 module key_ctrl #(
     parameter integer CLK_HZ  = 148500000,
     parameter integer DB_MS   = 15,
-    parameter integer LONG_MS = 600
+    parameter integer LONG_MS = 400
 )(
     input  wire clk,
     input  wire rst_n,
